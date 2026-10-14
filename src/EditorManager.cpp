@@ -257,11 +257,6 @@ void EditorManager::setupEditor(ScintillaNext *editor)
 #endif
 
     editor->setFoldMarkers(QStringLiteral("box"));
-    for (int i = SC_MARKNUM_FOLDEREND; i <= SC_MARKNUM_FOLDEROPEN; ++i) {
-        editor->markerSetFore(i, 0xF3F3F3);
-        editor->markerSetBack(i, 0x808080);
-        editor->markerSetBackSelected(i, 0x0000FF);
-    }
 
     editor->setScaleTechnique(SCALE_TECHNIQUE_PIXEL_ALIGNED);
 
@@ -300,8 +295,6 @@ void EditorManager::setupEditor(ScintillaNext *editor)
     editor->setCaretLineVisibleAlways(true);
     editor->setCaretWidth(2);
 
-    editor->setEdgeColour(0x80FFFF);
-
     // https://www.scintilla.org/ScintillaDoc.html#ElementColours
     // SC_ELEMENT_SELECTION_TEXT
     // SC_ELEMENT_SELECTION_BACK
@@ -310,21 +303,14 @@ void EditorManager::setupEditor(ScintillaNext *editor)
     // SC_ELEMENT_SELECTION_SECONDARY_TEXT
     // SC_ELEMENT_SELECTION_SECONDARY_BACK
     // SC_ELEMENT_SELECTION_INACTIVE_TEXT
-    editor->setElementColour(SC_ELEMENT_SELECTION_INACTIVE_BACK, 0xFFE0E0E0);
     // SC_ELEMENT_CARET
     // SC_ELEMENT_CARET_ADDITIONAL
-    editor->setElementColour(SC_ELEMENT_CARET_LINE_BACK, 0xFFFFE8E8);
-    editor->setElementColour(SC_ELEMENT_WHITE_SPACE, 0xFFD0D0D0);
     // SC_ELEMENT_WHITE_SPACE_BACK
     // SC_ELEMENT_HOT_SPOT_ACTIVE
     // SC_ELEMENT_HOT_SPOT_ACTIVE_BACK
-    editor->setElementColour(SC_ELEMENT_FOLD_LINE, 0xFFA0A0A0);
     // SC_ELEMENT_HIDDEN_LINE
 
     editor->setWhitespaceSize(2);
-
-    editor->setFoldMarginColour(true, 0xFFFFFF);
-    editor->setFoldMarginHiColour(true, 0xE9E9E9);
 
     editor->setAutomaticFold(SC_AUTOMATICFOLD_SHOW | SC_AUTOMATICFOLD_CLICK | SC_AUTOMATICFOLD_CHANGE);
     editor->markerEnableHighlight(true);
@@ -332,28 +318,7 @@ void EditorManager::setupEditor(ScintillaNext *editor)
     editor->setCharsDefault();
     editor->setWordChars(editor->wordChars() + settings->additionalWordChars().toLatin1());
 
-    editor->styleSetFore(STYLE_DEFAULT, 0x000000);
-    editor->styleSetBack(STYLE_DEFAULT, 0xFFFFFF);
-    editor->styleSetSize(STYLE_DEFAULT, settings->fontSize());
-    editor->styleSetFont(STYLE_DEFAULT, settings->fontName().toUtf8().data());
-    editor->styleClearAll();
-
-    editor->styleSetFore(STYLE_LINENUMBER, 0x808080);
-    editor->styleSetBack(STYLE_LINENUMBER, 0xE4E4E4);
-    editor->styleSetBold(STYLE_LINENUMBER, false);
-
-    editor->styleSetFore(STYLE_BRACELIGHT, 0x0000FF);
-    editor->styleSetBack(STYLE_BRACELIGHT, 0xFFFFFF);
-
-    editor->styleSetFore(STYLE_BRACEBAD, 0x000080);
-    editor->styleSetBack(STYLE_BRACEBAD, 0xFFFFFF);
-
-    editor->styleSetFore(STYLE_INDENTGUIDE, 0xC0C0C0);
-    editor->styleSetBack(STYLE_INDENTGUIDE, 0xFFFFFF);
-
-    // STYLE_CONTROLCHAR
-    // STYLE_CALLTIP
-    // STYLE_FOLDDISPLAYTEXT
+    applyTheme(editor);
 
     editor->setViewWS(settings->showWhitespace() ? SCWS_VISIBLEALWAYS : SCWS_INVISIBLE);
     editor->setViewEOL(settings->showEndOfLine());
@@ -409,6 +374,95 @@ void EditorManager::setupEditor(ScintillaNext *editor)
     bm->setEnabled(true);
 
     new HTMLAutoCompleteDecorator(editor);
+}
+
+void EditorManager::applyTheme(ScintillaNext *editor)
+{
+    // Colors are Scintilla colors (0xBBGGRR) for styles/markers and 0xAABBGGRR for elements
+    struct Palette {
+        int defaultFore, defaultBack;
+        int lineNumberFore, lineNumberBack;
+        int braceLightFore, braceBadFore;
+        int indentGuideFore;
+        int edge;
+        int foldMarginBack, foldMarginHi;
+        int foldMarkerFore, foldMarkerBack, foldMarkerSelected;
+        int selectionInactiveBack, caretLineBack, whiteSpace, foldLine;
+    };
+
+    static const Palette light = {
+        0x000000, 0xFFFFFF,
+        0x808080, 0xE4E4E4,
+        0x0000FF, 0x000080,
+        0xC0C0C0,
+        0x80FFFF,
+        0xFFFFFF, 0xE9E9E9,
+        0xF3F3F3, 0x808080, 0x0000FF,
+        static_cast<int>(0xFFE0E0E0), static_cast<int>(0xFFFFE8E8), static_cast<int>(0xFFD0D0D0), static_cast<int>(0xFFA0A0A0),
+    };
+
+    static const Palette dark = {
+        0xD4D4D4, 0x1E1E1E,
+        0x858585, 0x252526,
+        0x50C8FF, 0x5050FF,
+        0x404040,
+        0x505050,
+        0x1E1E1E, 0x2A2A2A,
+        0x1E1E1E, 0xA0A0A0, 0xFFB070,
+        static_cast<int>(0xFF404040), static_cast<int>(0xFF2D2D2D), static_cast<int>(0xFF505050), static_cast<int>(0xFF606060),
+    };
+
+    const bool isDark = settings->darkMode();
+    const Palette &p = isDark ? dark : light;
+
+    for (int i = SC_MARKNUM_FOLDEREND; i <= SC_MARKNUM_FOLDEROPEN; ++i) {
+        editor->markerSetFore(i, p.foldMarkerFore);
+        editor->markerSetBack(i, p.foldMarkerBack);
+        editor->markerSetBackSelected(i, p.foldMarkerSelected);
+    }
+
+    editor->setEdgeColour(p.edge);
+
+    editor->setElementColour(SC_ELEMENT_SELECTION_INACTIVE_BACK, p.selectionInactiveBack);
+    editor->setElementColour(SC_ELEMENT_CARET_LINE_BACK, p.caretLineBack);
+    editor->setElementColour(SC_ELEMENT_WHITE_SPACE, p.whiteSpace);
+    editor->setElementColour(SC_ELEMENT_FOLD_LINE, p.foldLine);
+
+    if (isDark) {
+        editor->setElementColour(SC_ELEMENT_SELECTION_BACK, static_cast<int>(0xFF784F26));
+        editor->setElementColour(SC_ELEMENT_CARET, static_cast<int>(0xFFFFFFFF));
+    }
+    else {
+        // Go back to the Scintilla defaults
+        editor->resetElementColour(SC_ELEMENT_SELECTION_BACK);
+        editor->resetElementColour(SC_ELEMENT_CARET);
+    }
+
+    editor->setFoldMarginColour(true, p.foldMarginBack);
+    editor->setFoldMarginHiColour(true, p.foldMarginHi);
+
+    editor->styleSetFore(STYLE_DEFAULT, p.defaultFore);
+    editor->styleSetBack(STYLE_DEFAULT, p.defaultBack);
+    editor->styleSetSize(STYLE_DEFAULT, settings->fontSize());
+    editor->styleSetFont(STYLE_DEFAULT, settings->fontName().toUtf8().data());
+    editor->styleClearAll();
+
+    editor->styleSetFore(STYLE_LINENUMBER, p.lineNumberFore);
+    editor->styleSetBack(STYLE_LINENUMBER, p.lineNumberBack);
+    editor->styleSetBold(STYLE_LINENUMBER, false);
+
+    editor->styleSetFore(STYLE_BRACELIGHT, p.braceLightFore);
+    editor->styleSetBack(STYLE_BRACELIGHT, p.defaultBack);
+
+    editor->styleSetFore(STYLE_BRACEBAD, p.braceBadFore);
+    editor->styleSetBack(STYLE_BRACEBAD, p.defaultBack);
+
+    editor->styleSetFore(STYLE_INDENTGUIDE, p.indentGuideFore);
+    editor->styleSetBack(STYLE_INDENTGUIDE, p.defaultBack);
+
+    // STYLE_CONTROLCHAR
+    // STYLE_CALLTIP
+    // STYLE_FOLDDISPLAYTEXT
 }
 
 void EditorManager::purgeOldEditorPointers()

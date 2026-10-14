@@ -25,6 +25,7 @@
 #include "SingleApplication"
 
 #include <QCommandLineParser>
+#include <QPalette>
 #include <QPointer>
 #include <QTimer>
 
@@ -83,6 +84,12 @@ private:
     void openFiles(const QStringList &files);
 
     void loadSettings();
+
+    void applyApplicationTheme();
+
+    QString defaultStyleName;
+    QPalette defaultPalette;
+    bool themeOverridden = false;
 
     EditorManager *editorManager;
     RecentFilesListManager *recentFilesListManager;

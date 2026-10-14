@@ -26,6 +26,7 @@
 #include "ui_SearchResultsDock.h"
 
 #include <QKeyEvent>
+#include <QWheelEvent>
 #include <QPointer>
 #include <QMenu>
 #include <QShortcut>
@@ -41,9 +42,12 @@ SearchResultsDock::SearchResultsDock(QWidget *parent) :
     // Close the results when escape is pressed
     new QShortcut(QKeySequence::Cancel, this, this, &SearchResultsDock::close, Qt::WidgetWithChildrenShortcut);
 
+    // Keep Ctrl+A for the results instead of the window level "Select All" of the editor
+    ui->treeWidget->installEventFilter(this);
+    ui->treeWidget->viewport()->installEventFilter(this);
+
     connect(ui->treeWidget, &QTreeWidget::itemActivated, this, &SearchResultsDock::itemActivated);
     connect(ui->treeWidget, &QTreeWidget::itemExpanded, this, &SearchResultsDock::itemExpanded);
-    connect(ui->btnCopyResults, &QToolButton::released,this, &SearchResultsDock::copyAllSearchResultsToClipboard);
 
     connect(ui->treeWidget, &QTreeWidget::customContextMenuRequested, this, [this](const QPoint &pos) {
         QTreeWidgetItem *item = ui->treeWidget->itemAt(pos);
@@ -69,19 +73,88 @@ SearchResultsDock::SearchResultsDock(QWidget *parent) :
     ui->treeWidget->setItemDelegate(new SearchResultHighlighterDelegate(ui->treeWidget));
 
     ApplicationSettings *settings = qobject_cast<NotepadNextApplication*>(qApp)->getSettings();
-    auto updateTreeWidgetFont = [=, this]() {
-        QFont f(settings->fontName(), settings->fontSize());
-        ui->treeWidget->setFont(f);
-        ui->treeWidget->resizeColumnToContents(0);
-    };
-    connect(settings, &ApplicationSettings::fontNameChanged, this, updateTreeWidgetFont);
-    connect(settings, &ApplicationSettings::fontSizeChanged, this, updateTreeWidgetFont);
+    connect(settings, &ApplicationSettings::fontNameChanged, this, &SearchResultsDock::updateTreeWidgetFont);
+    connect(settings, &ApplicationSettings::fontSizeChanged, this, &SearchResultsDock::updateTreeWidgetFont);
+    updateTreeWidgetFont();
+}
+
+void SearchResultsDock::updateTreeWidgetFont()
+{
+    ApplicationSettings *settings = qobject_cast<NotepadNextApplication*>(qApp)->getSettings();
+
+    QFont f(settings->fontName(), qBound(4, settings->fontSize() + zoomOffset, 72));
+    ui->treeWidget->setFont(f);
+    ui->treeWidget->resizeColumnToContents(0);
+}
+
+void SearchResultsDock::zoomResults(int delta)
+{
+    // 0 means reset
+    zoomOffset = delta == 0 ? 0 : zoomOffset + delta;
     updateTreeWidgetFont();
 }
 
 SearchResultsDock::~SearchResultsDock()
 {
     delete ui;
+}
+
+// Returns +1 for zoom in, -1 for zoom out, 0 for reset, or -100 when it is not a zoom key
+static int zoomKeyDelta(const QKeyEvent *ke)
+{
+    if (!(ke->modifiers() & Qt::ControlModifier)) {
+        return -100;
+    }
+
+    switch (ke->key()) {
+    case Qt::Key_Plus:
+    case Qt::Key_Equal:
+        return 1;
+    case Qt::Key_Minus:
+    case Qt::Key_Underscore:
+        return -1;
+    case Qt::Key_0:
+        return 0;
+    default:
+        return -100;
+    }
+}
+
+bool SearchResultsDock::eventFilter(QObject *watched, QEvent *event)
+{
+    if (watched == ui->treeWidget && event->type() == QEvent::ShortcutOverride) {
+        // Accepting this makes the key press go to the tree, rather than triggering the (window wide)
+        // shortcut of the main window which would act on the editors
+        const QKeyEvent *ke = static_cast<QKeyEvent *>(event);
+
+        if (ke->matches(QKeySequence::SelectAll) || zoomKeyDelta(ke) != -100) {
+            event->accept();
+            return true;
+        }
+    }
+    else if (watched == ui->treeWidget && event->type() == QEvent::KeyPress) {
+        const int delta = zoomKeyDelta(static_cast<QKeyEvent *>(event));
+
+        if (delta != -100) {
+            zoomResults(delta);
+            return true;
+        }
+    }
+    else if (watched == ui->treeWidget->viewport() && event->type() == QEvent::Wheel) {
+        QWheelEvent *we = static_cast<QWheelEvent *>(event);
+
+        if ((we->modifiers() & Qt::ControlModifier) && we->angleDelta().y() != 0) {
+            zoomResults(we->angleDelta().y() > 0 ? 1 : -1);
+            return true;
+        }
+    }
+
+    return QDockWidget::eventFilter(watched, event);
+}
+
+bool SearchResultsDock::isDark() const
+{
+    return ui->treeWidget->palette().color(QPalette::Base).lightness() < 128;
 }
 
 void SearchResultsDock::newSearch(const QString searchTerm)
@@ -99,8 +172,8 @@ void SearchResultsDock::newSearch(const QString searchTerm)
     currentSearch = new QTreeWidgetItem();
     ui->treeWidget->insertTopLevelItem(0, currentSearch);
 
-    currentSearch->setBackground(0, QColor(232, 232, 255));
-    currentSearch->setForeground(0, QColor(0, 0, 170));
+    currentSearch->setBackground(0, isDark() ? QColor(38, 38, 72) : QColor(232, 232, 255));
+    currentSearch->setForeground(0, isDark() ? QColor(140, 170, 255) : QColor(0, 0, 170));
     currentSearch->setExpanded(true);
     currentSearch->setFirstColumnSpanned(true);
 
@@ -118,8 +191,8 @@ void SearchResultsDock::newFileEntry(ScintillaNext *editor)
     currentFile = new QTreeWidgetItem(currentSearch);
     currentFile->setData(0, Qt::UserRole, QVariant::fromValue(editor_pointer));
 
-    currentFile->setBackground(0, QColor(213, 255, 213));
-    currentFile->setForeground(0, QColor(0, 128, 0));
+    currentFile->setBackground(0, isDark() ? QColor(30, 62, 30) : QColor(213, 255, 213));
+    currentFile->setForeground(0, isDark() ? QColor(120, 210, 120) : QColor(0, 128, 0));
     currentFile->setExpanded(true);
     currentFile->setFirstColumnSpanned(true);
 
@@ -133,7 +206,7 @@ void SearchResultsDock::newResultsEntry(const QString line, int lineNumber, int 
 
     // Scintilla internally references line numbers starting at 0, however it needs displayed starting at 1
     item->setText(0, QString::number(lineNumber + 1));
-    item->setBackground(0, QBrush(QColor(220, 220, 220)));
+    item->setBackground(0, QBrush(isDark() ? QColor(50, 50, 50) : QColor(220, 220, 220)));
     item->setTextAlignment(0, Qt::AlignRight);
 
     item->setData(1, SearchResultData::LineNumber, lineNumber);

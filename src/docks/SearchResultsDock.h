@@ -44,6 +44,9 @@ public:
     void newResultsEntry(const QString line, int lineNumber, int startPositionFromBeginning, int endPositionFromBeginning, int hitCount=1) override;
     void completeSearch() override;
 
+protected:
+    bool eventFilter(QObject *watched, QEvent *event) override;
+
 public slots:
     void collapseAll() const;
     void expandAll() const;
@@ -61,6 +64,10 @@ signals:
     void searchResultActivated(ScintillaNext *editor, int lineNumber, int startPositionFromBeginning, int endPositionFromBeginning);
 
 private:
+    bool isDark() const;
+    void updateTreeWidgetFont();
+    void zoomResults(int delta);
+    int zoomOffset = 0;
     void updateSearchStatus();
     Ui::SearchResultsDock *ui;
 

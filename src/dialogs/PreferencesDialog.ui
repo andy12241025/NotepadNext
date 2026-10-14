@@ -209,6 +209,13 @@
         </widget>
        </item>
        <item>
+        <widget class="QCheckBox" name="checkBoxDarkMode">
+         <property name="text">
+          <string>Dark Mode</string>
+         </property>
+        </widget>
+       </item>
+       <item>
         <widget class="QCheckBox" name="checkBoxAutoCompletion">
          <property name="text">
           <string>Auto Completion</string>

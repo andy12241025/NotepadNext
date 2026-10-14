@@ -24,6 +24,10 @@
 
 #include <memory>
 
+#ifdef Q_OS_WIN
+#include <windows.h>
+#endif
+
 QString TranslationFileNameToLocaleName(const QString &baseName)
 {
     // return "zh_CN" from "NotepadNext_zh_CN"
@@ -65,10 +69,36 @@ QString TranslationManager::FormatLocaleTerritoryAndLanguage(QLocale &locale)
     return QStringLiteral("%1 (%2)").arg(language, territory);
 }
 
+QString TranslationManager::systemUiLanguageName()
+{
+#ifdef Q_OS_WIN
+    // This is the Windows display language. QLocale::system() is the regional format, and its list of
+    // UI languages can still end up naming a different language than the one Windows is displayed in.
+    wchar_t name[LOCALE_NAME_MAX_LENGTH] = {};
+    if (LCIDToLocaleName(MAKELCID(GetUserDefaultUILanguage(), SORT_DEFAULT), name, LOCALE_NAME_MAX_LENGTH, 0) > 0) {
+        return QString::fromWCharArray(name);
+    }
+#endif
+
+    const QStringList uiLanguages = QLocale::system().uiLanguages();
+    return uiLanguages.isEmpty() ? QLocale::system().name() : uiLanguages.first();
+}
+
 void TranslationManager::loadSystemDefaultTranslation()
 {
-    // The wrong translation file may be loaded when passing Locale::system() to loadTranslation function, e.g. "zh_CN" translation file will be loaded when the locale is "en_US". It's probably a Qt bug.
-    loadTranslation(QLocale(QLocale::system().name()));
+    // Don't use QLocale::system().name(), that is the regional format (e.g. "zh_CN" when the format
+    // is Chinese but the display language is English).
+    // The locale is built from a name since passing QLocale::system() directly can load the wrong file.
+    const QLocale locale(systemUiLanguageName());
+
+    // English is the source language and has no translation file. Loading would otherwise fall
+    // through to the next preferred language and translate the UI anyway.
+    if (locale.language() == QLocale::English) {
+        qInfo("Using built-in English");
+        return;
+    }
+
+    loadTranslation(locale);
 }
 
 void TranslationManager::loadTranslation(QLocale locale)

@@ -101,6 +101,7 @@ PreferencesDialog::PreferencesDialog(ApplicationSettings *settings, QWidget *par
 
     MapSettingToCheckBox(ui->checkBoxHighlightURLs, &ApplicationSettings::urlHighlighting, &ApplicationSettings::setURLHighlighting, &ApplicationSettings::urlHighlightingChanged);
     MapSettingToCheckBox(ui->checkBoxShowLineNumbers, &ApplicationSettings::showLineNumbers, &ApplicationSettings::setShowLineNumbers, &ApplicationSettings::showLineNumbersChanged);
+    MapSettingToCheckBox(ui->checkBoxDarkMode, &ApplicationSettings::darkMode, &ApplicationSettings::setDarkMode, &ApplicationSettings::darkModeChanged);
     MapSettingToCheckBox(ui->checkBoxAutoCompletion, &ApplicationSettings::autoCompletion, &ApplicationSettings::setAutoCompletion, &ApplicationSettings::autoCompletionChanged);
 
     QButtonGroup *buttonGroup = new QButtonGroup(this);

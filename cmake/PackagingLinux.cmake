@@ -48,18 +48,22 @@ list(APPEND APPIMAGE_ENV_VARS QMAKE=${APPIMAGE_QMAKE})
 
 install(TARGETS NotepadNext
     RUNTIME DESTINATION bin
+    COMPONENT app
 )
 install(FILES
     ${PROJECT_SOURCE_DIR}/deploy/linux/NotepadNext.desktop
     DESTINATION share/applications
+    COMPONENT app
 )
 install(FILES
     ${PROJECT_SOURCE_DIR}/icon/NotepadNext.svg
     DESTINATION share/icons/hicolor/scalable/apps
+    COMPONENT app
 )
 install(FILES
     ${PROJECT_SOURCE_DIR}/icon/NotepadNext.svg
     DESTINATION share/icons/hicolor/scalable/mimetypes
+    COMPONENT app
 )
 
 add_custom_target(appdir
@@ -91,3 +95,19 @@ add_custom_target(appimage
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
     DEPENDS appdir download_linuxdeploy
 )
+
+# Debian package: configure with -DCMAKE_BUILD_TYPE=Release, build, then run `cpack -G DEB` in the build directory
+set(CPACK_PACKAGE_NAME notepadnext)
+set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "${PROJECT_DESCRIPTION}")
+set(CPACK_PACKAGE_CONTACT "Andy <andyliuera@gmail.com>")
+set(CPACK_PACKAGING_INSTALL_PREFIX /usr)
+# Only package the application, not the headers/libraries of bundled third party projects
+set(CPACK_DEB_COMPONENT_INSTALL ON)
+set(CPACK_COMPONENTS_ALL app)
+set(CPACK_DEBIAN_APP_PACKAGE_NAME notepadnext)
+set(CPACK_DEBIAN_APP_FILE_NAME notepadnext_${PROJECT_VERSION}_amd64.deb)
+set(CPACK_DEBIAN_PACKAGE_SECTION editors)
+set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
+set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
+include(CPack)

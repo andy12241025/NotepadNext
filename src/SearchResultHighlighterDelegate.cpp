@@ -67,11 +67,13 @@ void SearchResultHighlighterDelegate::paint(QPainter *painter, const QStyleOptio
     boldFont.setBold(true);
     painter->setFont(boldFont);
 
-    int matchWidth = fm.horizontalAdvance(match);
+    // Measure with the bold font it is drawn with, otherwise it overlaps the text following it
+    int matchWidth = QFontMetrics(boldFont).horizontalAdvance(match);
     QRect highlightRect(x, textRect.top(), matchWidth, textRect.height());
-    painter->fillRect(highlightRect, QColor(Qt::yellow));
+    const bool dark = opt.palette.color(QPalette::Base).lightness() < 128;
+    painter->fillRect(highlightRect, dark ? QColor(110, 90, 0) : QColor(Qt::yellow));
 
-    painter->setPen(Qt::red);
+    painter->setPen(dark ? QColor(255, 120, 120) : QColor(Qt::red));
     painter->drawText(x, y, match);
     x += matchWidth;
 

@@ -97,6 +97,8 @@ public:
     DEFINE_SETTING(TabsClosable, tabsClosable, bool)
     DEFINE_SETTING(ExitOnLastTabClosed, exitOnLastTabClosed, bool)
 
+    DEFINE_SETTING(DarkMode, darkMode, bool)
+
     DEFINE_SETTING(CombineSearchResults, combineSearchResults, bool)
 
     DEFINE_SETTING(RestorePreviousSession, restorePreviousSession, bool)

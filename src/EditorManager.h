@@ -41,6 +41,12 @@ public:
 
     void manageEditor(ScintillaNext *editor);
 
+    // Applies the base (light or dark) colors to an editor. This clears all styles, so the language
+    // needs to be re-applied afterwards.
+    void applyTheme(ScintillaNext *editor);
+
+    QList<QPointer<ScintillaNext>> getEditors();
+
 signals:
     void editorCreated(ScintillaNext *editor);
     void editorClosed(ScintillaNext *editor);
@@ -48,7 +54,6 @@ signals:
 private:
     void setupEditor(ScintillaNext *editor);
     void purgeOldEditorPointers();
-    QList<QPointer<ScintillaNext>> getEditors();
     int detectEOLMode(ScintillaNext *editor) const;
 
     QList<QPointer<ScintillaNext>> editors;

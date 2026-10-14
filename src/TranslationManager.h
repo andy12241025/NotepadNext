@@ -35,6 +35,9 @@ public:
 
     static QString FormatLocaleTerritoryAndLanguage(QLocale &locale);
 
+    // Name of the language the OS user interface is displayed in (not the regional format)
+    static QString systemUiLanguageName();
+
 public slots:
     void loadSystemDefaultTranslation();
     void loadTranslation(QLocale locale);

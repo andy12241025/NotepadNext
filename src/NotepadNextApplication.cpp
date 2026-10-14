@@ -36,6 +36,8 @@
 #include "Lexilla.h"
 
 #include <QCommandLineParser>
+#include <QPalette>
+#include <QStyle>
 
 #include <QDirIterator>
 
@@ -152,6 +154,23 @@ bool NotepadNextApplication::init()
     luaState->executeFile(":/scripts/init.lua");
     LuaExtension::Instance().Initialise(luaState->L, Q_NULLPTR);
 
+    applyApplicationTheme();
+    connect(settings, &ApplicationSettings::darkModeChanged, this, [this](bool) {
+        applyApplicationTheme();
+
+        // Re-color every open editor. Applying the theme clears all styles so the language has to be applied again
+        for (auto &editor : editorManager->getEditors()) {
+            if (editor.isNull())
+                continue;
+
+            editorManager->applyTheme(editor);
+
+            if (!editor->languageName.isEmpty()) {
+                setEditorLanguage(editor, editor->languageName);
+            }
+        }
+    });
+
     createNewWindow();
     connect(editorManager, &EditorManager::editorCreated, window, &MainWindow::addEditor);
 
@@ -258,6 +277,67 @@ QString NotepadNextApplication::getFileDialogFilterForLanguage(const QString &la
     return getLuaState()->executeAndReturn<QString>("return FilterForLanguage(langForFilter)");
 }
 
+void NotepadNextApplication::applyApplicationTheme()
+{
+    qInfo(Q_FUNC_INFO);
+
+    // Remember what the platform started with so light mode can restore it
+    if (defaultStyleName.isEmpty()) {
+        defaultStyleName = style()->objectName();
+        defaultPalette = palette();
+    }
+
+    if (settings->darkMode()) {
+        // Native styles (e.g. windowsvista, macOS) largely ignore palettes, Fusion honors them
+        setStyle(QStringLiteral("Fusion"));
+
+        const QColor window(45, 45, 45);
+        const QColor base(30, 30, 30);
+        const QColor text(212, 212, 212);
+        const QColor button(60, 60, 60);
+        const QColor disabled(127, 127, 127);
+        const QColor highlight(38, 79, 120);
+
+        QPalette p;
+        p.setColor(QPalette::Window, window);
+        p.setColor(QPalette::WindowText, text);
+        p.setColor(QPalette::Base, base);
+        p.setColor(QPalette::AlternateBase, QColor(37, 37, 38));
+        p.setColor(QPalette::ToolTipBase, button);
+        p.setColor(QPalette::ToolTipText, text);
+        p.setColor(QPalette::PlaceholderText, disabled);
+        p.setColor(QPalette::Text, text);
+        p.setColor(QPalette::Button, button);
+        p.setColor(QPalette::ButtonText, text);
+        p.setColor(QPalette::BrightText, Qt::red);
+        p.setColor(QPalette::Link, QColor(77, 166, 255));
+        p.setColor(QPalette::LinkVisited, QColor(180, 130, 255));
+        p.setColor(QPalette::Highlight, highlight);
+        p.setColor(QPalette::HighlightedText, Qt::white);
+        p.setColor(QPalette::Light, QColor(90, 90, 90));
+        p.setColor(QPalette::Midlight, QColor(75, 75, 75));
+        p.setColor(QPalette::Mid, QColor(50, 50, 50));
+        p.setColor(QPalette::Dark, QColor(25, 25, 25));
+        p.setColor(QPalette::Shadow, QColor(10, 10, 10));
+
+        p.setColor(QPalette::Disabled, QPalette::WindowText, disabled);
+        p.setColor(QPalette::Disabled, QPalette::Text, disabled);
+        p.setColor(QPalette::Disabled, QPalette::ButtonText, disabled);
+        p.setColor(QPalette::Disabled, QPalette::HighlightedText, disabled);
+        p.setColor(QPalette::Disabled, QPalette::Highlight, QColor(60, 60, 60));
+
+        setPalette(p);
+        themeOverridden = true;
+    }
+    else if (themeOverridden) {
+        // Put back exactly what the platform provided. style()->standardPalette() is not the same
+        // thing, it is a generic classic gray palette that ignores the system theme
+        setStyle(defaultStyleName);
+        setPalette(defaultPalette);
+        themeOverridden = false;
+    }
+}
+
 QStringList NotepadNextApplication::getLanguages() const
 {
     return getLuaState()->executeAndReturn<QStringList>(
@@ -291,6 +371,7 @@ void NotepadNextApplication::setEditorLanguage(ScintillaNext *editor, const QStr
     bool skipTabs = editor->QObject::property("nn_skip_usetabs").isValid();
     bool skipTabWidth = editor->QObject::property("nn_skip_tabwidth").isValid();
 
+    getLuaState()->setVariable("dark_mode", settings->darkMode());
     getLuaState()->setVariable("skip_tabs", skipTabs);
     getLuaState()->setVariable("skip_tabwidth", skipTabWidth);
 
@@ -507,6 +588,10 @@ QStringList NotepadNextApplication::debugInfo() const
     info.append(QStringLiteral("Qt: %1").arg(qVersion()));
     info.append(QStringLiteral("OS: %1").arg(QSysInfo::prettyProductName()));
     info.append(QStringLiteral("Locale: %1").arg(QLocale::system().name()));
+    info.append(QStringLiteral("UI Language: %1").arg(TranslationManager::systemUiLanguageName()));
+    // This is called before init() so the settings member is not available yet
+    const QString translation = ApplicationSettings().translation();
+    info.append(QStringLiteral("Translation Setting: %1").arg(translation.isEmpty() ? QStringLiteral("<System Default>") : translation));
     info.append(QStringLiteral("CPU: %1").arg(QSysInfo::currentCpuArchitecture()));
     info.append(QStringLiteral("File Path: %1").arg(applicationFilePath()));
     info.append(QStringLiteral("Arguments: %1").arg(arguments().join(' ')));

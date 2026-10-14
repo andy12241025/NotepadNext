@@ -2,6 +2,74 @@ function rgb(x)
     return ((x & 0xFF) << 16) | (x & 0xFF00) | ((x & 0xFF0000) >> 16)
 end
 
+-- Dark mode support. Language definitions are authored for a light background, so when dark mode
+-- is enabled (the C++ side sets the global "dark_mode") each color is remapped by inverting its
+-- lightness while keeping its hue. Colors are Scintilla colors, i.e. 0xBBGGRR as returned by rgb().
+local function clamp(v, lo, hi)
+    return math.max(lo, math.min(hi, v))
+end
+
+local function toHsl(c)
+    local r, g, b = (c & 0xFF) / 255, ((c >> 8) & 0xFF) / 255, ((c >> 16) & 0xFF) / 255
+    local max, min = math.max(r, g, b), math.min(r, g, b)
+    local l = (max + min) / 2
+    local h, s = 0, 0
+
+    if max ~= min then
+        local d = max - min
+        s = l > 0.5 and d / (2 - max - min) or d / (max + min)
+        if max == r then
+            h = (g - b) / d + (g < b and 6 or 0)
+        elseif max == g then
+            h = (b - r) / d + 2
+        else
+            h = (r - g) / d + 4
+        end
+        h = h / 6
+    end
+
+    return h, s, l
+end
+
+local function fromHsl(h, s, l)
+    local function hue(p, q, t)
+        if t < 0 then t = t + 1 end
+        if t > 1 then t = t - 1 end
+        if t < 1/6 then return p + (q - p) * 6 * t end
+        if t < 1/2 then return q end
+        if t < 2/3 then return p + (q - p) * (2/3 - t) * 6 end
+        return p
+    end
+
+    local r, g, b
+    if s == 0 then
+        r, g, b = l, l, l
+    else
+        local q = l < 0.5 and l * (1 + s) or l + s - l * s
+        local p = 2 * l - q
+        r, g, b = hue(p, q, h + 1/3), hue(p, q, h), hue(p, q, h - 1/3)
+    end
+
+    local function byte(v) return math.floor(clamp(v, 0, 1) * 255 + 0.5) end
+    return byte(r) | (byte(g) << 8) | (byte(b) << 16)
+end
+
+function AdaptColor(c, isBackground)
+    if not dark_mode or c == nil then
+        return c
+    end
+
+    local h, s, l = toHsl(c)
+
+    if isBackground then
+        -- White becomes a soft near-black, light tints become slightly lighter dark tones
+        return fromHsl(h, s * 0.6, 0.12 + 0.2 * (1 - l))
+    else
+        -- Black text becomes soft white, dark/saturated colors are brightened so they stay readable
+        return fromHsl(h, s, clamp(1 - l, 0.70, 0.88))
+    end
+end
+
 function DetectLanguageFromContents(contents)
     for name, L in pairs(languages) do
         if L.first_line then
@@ -51,8 +119,8 @@ end
 function SetStyle(L)
     if L.styles then
         for _, style in pairs(L.styles) do
-            editor.StyleFore[style.id] = style.fgColor
-            editor.StyleBack[style.id] = style.bgColor
+            editor.StyleFore[style.id] = AdaptColor(style.fgColor, false)
+            editor.StyleBack[style.id] = AdaptColor(style.bgColor, true)
 
             if style.fontStyle then
                 editor.StyleBold[style.id] = (style.fontStyle & 1 == 1)

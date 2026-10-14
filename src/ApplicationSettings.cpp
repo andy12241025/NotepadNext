@@ -49,6 +49,8 @@ CREATE_SETTING(Gui, CenterSearchDialog, centerSearchDialog, bool, true)
 CREATE_SETTING(Gui, TabsClosable, tabsClosable, bool, true)
 CREATE_SETTING(Gui, ExitOnLastTabClosed, exitOnLastTabClosed, bool, false)
 
+CREATE_SETTING(Gui, DarkMode, darkMode, bool, false)
+
 CREATE_SETTING(Gui, CombineSearchResults, combineSearchResults, bool, false)
 
 CREATE_SETTING(App, RestorePreviousSession, restorePreviousSession, bool, false)

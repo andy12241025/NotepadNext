@@ -729,6 +729,9 @@ MainWindow::MainWindow(NotepadNextApplication *app) :
     connect(app->getSettings(), &ApplicationSettings::wordWrapChanged, ui->actionWordWrap, &QAction::setChecked);
     connect(ui->actionWordWrap, &QAction::toggled, app->getSettings(), &ApplicationSettings::setWordWrap);
 
+    // "+" needs shift on most keyboard layouts, so also accept the unshifted "=" key
+    ui->actionZoomIn->setShortcuts({QKeySequence(QStringLiteral("Ctrl++")), QKeySequence(QStringLiteral("Ctrl+="))});
+
     // Zooming controls all editors simulaneously
     connect(ui->actionZoomIn, &QAction::triggered, this, [this]() {
         for (ScintillaNext *editor : editors()) {
@@ -1006,6 +1009,20 @@ MainWindow::MainWindow(NotepadNextApplication *app) :
         // Don't 'hide' it, else the actions won't be enabled
         ui->menuBar->setMaximumHeight(showMenuBar ? QWIDGETSIZE_MAX : 0);
     });
+    // The signal only fires on change, so apply the saved state at startup too
+    ui->menuBar->setMaximumHeight(app->getSettings()->showMenuBar() ? QWIDGETSIZE_MAX : 0);
+
+    // Needed to get the menu bar back with the keyboard once it has been hidden
+    QAction *actionShowMenuBar = new QAction(tr("Show Menu Bar"), this);
+    actionShowMenuBar->setCheckable(true);
+    actionShowMenuBar->setChecked(app->getSettings()->showMenuBar());
+    actionShowMenuBar->setShortcut(QKeySequence(QStringLiteral("Ctrl+M")));
+    actionShowMenuBar->setShortcutContext(Qt::WindowShortcut);
+    connect(actionShowMenuBar, &QAction::triggered, app->getSettings(), &ApplicationSettings::setShowMenuBar);
+    connect(app->getSettings(), &ApplicationSettings::showMenuBarChanged, actionShowMenuBar, &QAction::setChecked);
+    ui->menuView->addAction(actionShowMenuBar);
+    // Also owned by the window so the shortcut keeps working while the menu bar is collapsed
+    addAction(actionShowMenuBar);
     connect(app->getSettings(), &ApplicationSettings::showToolBarChanged, ui->mainToolBar, &QToolBar::setVisible);
     connect(app->getSettings(), &ApplicationSettings::showStatusBarChanged, ui->statusBar, &QStatusBar::setVisible);
     connect(ui->statusBar, &EditorInfoStatusBar::customContextMenuRequestedForEOLLabel, this, [this](const QPoint &pos){
@@ -1018,6 +1035,7 @@ MainWindow::MainWindow(NotepadNextApplication *app) :
     setupLanguageMenu();
 
     applyStyleSheet();
+    connect(app->getSettings(), &ApplicationSettings::darkModeChanged, this, &MainWindow::applyStyleSheet);
 
     restoreSettings();
 
@@ -1868,7 +1886,7 @@ void MainWindow::applyStyleSheet()
     qInfo(Q_FUNC_INFO);
 
     QString sheet;
-    QFile f(":/stylesheets/npp.css");
+    QFile f(app->getSettings()->darkMode() ? ":/stylesheets/npp-dark.css" : ":/stylesheets/npp.css");
     qInfo() << "Loading stylesheet:" << f.fileName();
 
     f.open(QFile::ReadOnly);
