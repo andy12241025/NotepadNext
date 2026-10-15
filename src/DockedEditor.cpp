@@ -27,6 +27,9 @@
 
 #include "ScintillaNext.h"
 
+#include <QAbstractButton>
+#include <QEvent>
+#include <QMouseEvent>
 #include <QUuid>
 
 
@@ -125,6 +128,35 @@ QVector<ScintillaNext *> DockedEditor::editors() const
     return editors;
 }
 
+void DockedEditor::setTabCloseButtonVisible(bool visible)
+{
+    tabCloseButtonVisible = visible;
+
+    // New tabs and tab activation changes consult these flags
+    ads::CDockManager::setConfigFlag(ads::CDockManager::AllTabsHaveCloseButton, visible);
+    ads::CDockManager::setConfigFlag(ads::CDockManager::ActiveTabHasCloseButton, visible);
+
+    for (const ads::CDockAreaWidget *areaWidget : dockManager->openedDockAreas()) {
+        for (const ads::CDockWidget *dockWidget : areaWidget->dockWidgets()) {
+            if (QAbstractButton *button = dockWidget->tabWidget()->findChild<QAbstractButton *>("tabCloseButton")) {
+                button->setVisible(visible);
+            }
+        }
+    }
+}
+
+bool DockedEditor::eventFilter(QObject *watched, QEvent *event)
+{
+    if (event->type() == QEvent::MouseButtonDblClick && static_cast<QMouseEvent *>(event)->button() == Qt::LeftButton) {
+        if (ads::CDockWidget *dockWidget = qobject_cast<ads::CDockWidget *>(watched->property("dockWidget").value<QObject *>())) {
+            emit dockWidget->closeRequested();
+            return true;
+        }
+    }
+
+    return QObject::eventFilter(watched, event);
+}
+
 void DockedEditor::switchToEditor(const ScintillaNext *editor)
 {
     ads::CDockWidget *dockWidget = qobject_cast<ads::CDockWidget *>(editor->parentWidget());
@@ -173,6 +205,16 @@ void DockedEditor::addEditor(ScintillaNext *editor)
     dockWidget->setFeature(ads::CDockWidget::DockWidgetFeature::DockWidgetDeleteOnClose, true);
     dockWidget->setFeature(ads::CDockWidget::DockWidgetFeature::CustomCloseHandling, true);
     dockWidget->setFeature(ads::CDockWidget::DockWidgetFeature::DockWidgetFloatable, false);
+
+    // Double-clicking a tab closes it
+    dockWidget->tabWidget()->setProperty("dockWidget", QVariant::fromValue<QObject *>(dockWidget));
+    dockWidget->tabWidget()->installEventFilter(this);
+
+    if (!tabCloseButtonVisible) {
+        if (QAbstractButton *button = dockWidget->tabWidget()->findChild<QAbstractButton *>("tabCloseButton")) {
+            button->setVisible(false);
+        }
+    }
 
     dockWidget->tabWidget()->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(dockWidget->tabWidget(), &QWidget::customContextMenuRequested, this, [=, this](const QPoint &pos) {

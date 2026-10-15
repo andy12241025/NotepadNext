@@ -33,6 +33,7 @@ private:
     ads::CDockManager* dockManager = Q_NULLPTR;
     ads::CDockAreaWidget* latestDockArea = Q_NULLPTR;
     ScintillaNext *currentEditor = Q_NULLPTR;
+    bool tabCloseButtonVisible = true;
 
 public:
     explicit DockedEditor(QWidget *parent);
@@ -42,6 +43,7 @@ public:
 
     QVector<ScintillaNext *> editors() const;
 
+    void setTabCloseButtonVisible(bool visible);
     void switchToEditor(const ScintillaNext *editor);
 
     int count() const;
@@ -51,6 +53,9 @@ public:
 
 public slots:
     void addEditor(ScintillaNext *editor);
+
+protected:
+    bool eventFilter(QObject *watched, QEvent *event) override;
 
 private slots:
     void dockWidgetCloseRequested();

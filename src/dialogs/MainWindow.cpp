@@ -121,6 +121,8 @@ MainWindow::MainWindow(NotepadNextApplication *app) :
     connect(dockedEditor, &DockedEditor::editorActivated, this, &MainWindow::activateEditor);
     connect(dockedEditor, &DockedEditor::contextMenuRequestedForEditor, this, &MainWindow::tabBarRightClicked);
     connect(dockedEditor, &DockedEditor::titleBarDoubleClicked, this, &MainWindow::newFile);
+    connect(app->getSettings(), &ApplicationSettings::showTabCloseButtonChanged, dockedEditor, &DockedEditor::setTabCloseButtonVisible);
+    dockedEditor->setTabCloseButtonVisible(app->getSettings()->showTabCloseButton());
 
     // Set up the menus
     connect(ui->actionNew, &QAction::triggered, this, &MainWindow::newFile);
